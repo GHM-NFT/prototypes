@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    :root{color-scheme:light dark;--bg:#0f172a;--card:#172033;--fg:#f8fafc;--muted:#a8b3c7;--accent:#7c3aed;--teal:#0f766e;--orange:#ea580c}
+    body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 Arial,sans-serif}
+    h1{font-size:18px;margin:0 0 4px}
+    .sub{color:var(--muted);margin-bottom:14px}
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;margin:10px 0}
+    label{display:block;font-weight:700;margin-bottom:6px}
+    select,textarea,button{width:100%;box-sizing:border-box;border-radius:10px;border:1px solid rgba(255,255,255,.15)}
+    select,textarea{padding:9px;background:#0b1220;color:var(--fg)}
+    textarea{min-height:190px;resize:vertical;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+    button{padding:10px 12px;font-weight:700;color:#fff;background:var(--accent);cursor:pointer;margin-top:8px}
+    button.secondary{background:var(--teal)}
+    button.warn{background:var(--orange)}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .status{min-height:20px;color:#bbf7d0;margin-top:8px}
+  </style>
+</head>
+<body>
+  <h1>AI Video Prompt Panel</h1>
+  <div class="sub">Copy safely, open the target tool, archive prompts or create experiment drafts.</div>
+
+  <div class="card">
+    <label for="promptType">Prompt output</label>
+    <select id="promptType">
+      <option value="final">Final prompt</option>
+      <option value="canonical">Canonical brief</option>
+      <option value="midjourney">Midjourney</option>
+      <option value="grok">Grok Imagine</option>
+      <option value="video">Veo / Kling / Luma / Runway</option>
+      <option value="avatar">HeyGen / Hedra</option>
+      <option value="depth">Immersity / LeiaPix</option>
+    </select>
+    <textarea id="prompt" readonly></textarea>
+    <div class="grid">
+      <button onclick="copyPrompt()">Copy prompt</button>
+      <button class="secondary" onclick="openTool()">Open target tool</button>
+    </div>
+    <div class="grid">
+      <button class="secondary" onclick="archivePrompt()">Archive prompt</button>
+      <button class="warn" onclick="draftExperiment()">Create experiment draft</button>
+    </div>
+    <div id="status" class="status" aria-live="polite"></div>
+  </div>
+
+<script>
+let payload = null;
+const statusEl = document.getElementById('status');
+const promptEl = document.getElementById('prompt');
+const typeEl = document.getElementById('promptType');
+
+function setStatus(text){ statusEl.textContent = text; }
+function refreshPrompt(){
+  if(!payload) return;
+  promptEl.value = payload.prompts[typeEl.value] || '';
+}
+function load(){
+  setStatus('Loading…');
+  google.script.run
+    .withSuccessHandler((data)=>{payload=data;refreshPrompt();setStatus(`Ready: ${data.tool}`);})
+    .withFailureHandler((err)=>setStatus(`Error: ${err.message || err}`))
+    .getPromptPayload();
+}
+async function copyPrompt(){
+  try{
+    await navigator.clipboard.writeText(promptEl.value);
+    setStatus('Prompt copied.');
+  }catch(err){
+    promptEl.focus();promptEl.select();
+    document.execCommand('copy');
+    setStatus('Prompt copied using fallback.');
+  }
+}
+function openTool(){
+  if(!payload) return;
+  window.open(payload.targetUrl,'_blank','noopener,noreferrer');
+  setStatus(`Opened ${payload.tool}.`);
+}
+function archivePrompt(){
+  setStatus('Archiving…');
+  google.script.run
+    .withSuccessHandler(()=>{setStatus('Prompt archived.');load();})
+    .withFailureHandler((err)=>setStatus(`Error: ${err.message || err}`))
+    .archiveCurrentPrompt();
+}
+function draftExperiment(){
+  setStatus('Creating draft…');
+  google.script.run
+    .withSuccessHandler(()=>setStatus('Experiment draft created.'))
+    .withFailureHandler((err)=>setStatus(`Error: ${err.message || err}`))
+    .createExperimentDraft();
+}
+typeEl.addEventListener('change',refreshPrompt);
+load();
+</script>
+</body>
+</html>
